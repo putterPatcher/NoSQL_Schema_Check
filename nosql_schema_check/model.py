@@ -30,7 +30,7 @@ class Model:
     name=""
     Schema={}
     Validations={}
-    Default = {}
+    Default={}
 
     @staticmethod
     def __get_type(item) -> str:return item.__class__.__name__
