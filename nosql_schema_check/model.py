@@ -27,6 +27,11 @@ class NP_Type:
 class Model:
     __Model_Schema = None
 
+    name=""
+    Schema={}
+    Validations={}
+    Default = {}
+
     @staticmethod
     def __get_type(item) -> str:return item.__class__.__name__
     
@@ -229,7 +234,7 @@ class Model:
                 if type(Schema) == dict and type(Validations) == dict:
                     type_dict = cls.__get_record_type(Schema, **Validations)
                 else:
-                    raise Exception("Blog.Schema and Blog.Validations must have type dict.")
+                    raise Exception("Model_Class.Schema and Model_Class.Validations must have type dict.")
                 if not type_dict:raise Exception("Object creation failed.")
                 _Models[name:=model_name.capitalize()] = type_dict
                 print("model {} generated successfully.".format(name))
@@ -239,7 +244,10 @@ class Model:
                 print("Error generating model {}".format(model_name.capitalize()))
                 print(e)
                 return None
-        cls.__Model_Schema = __generate_schema_object(cls.name, cls.Schema, cls.Validations)
+        if len(cls.Schema) > 0 and cls.name != "":
+            cls.__Model_Schema = __generate_schema_object(cls.name, cls.Schema, cls.Validations)
+        else:
+            print("Model_Class must have variables 'Schema' and 'name'.")
     
     @classmethod
     def print_schema(cls, schema:NP_Type | Type=None, tab=0):
