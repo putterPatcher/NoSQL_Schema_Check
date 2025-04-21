@@ -12,6 +12,10 @@ class Model_Class(Model):
 
 &nbsp;&nbsp;&nbsp;&nbsp;Default={field: function -> Default value}
 
+&nbsp;&nbsp;Optional variable -
+
+&nbsp;&nbsp;&nbsp;&nbsp;collection=Collection object.
+
 Model_Class.generate()
 
 ---
@@ -65,5 +69,7 @@ functions -
 &nbsp;&nbsp;&nbsp;Model_Class.update_records
 
 &nbsp;&nbsp;&nbsp;Model_Class.update_record
+
+&nbsp;&nbsp;&nbsp;Model_Class.collection
 
 ---
