@@ -1,5 +1,7 @@
 # NoSQL-Schema-Check
 
+## pip install NoSQL_Schema_Check
+
 from nosql_schema_check.model import Model
 
 class Model_Class(Model):
