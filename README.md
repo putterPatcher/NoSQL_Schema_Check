@@ -12,7 +12,7 @@ class Model_Class(Model):
 
 Model_Class.generate()
 
---
+---
 
 Schema = {
     
@@ -24,7 +24,7 @@ Schema = {
 
 }
 
---
+---
 
 Validations = {
     
@@ -36,7 +36,7 @@ Validations = {
 
 }
 
---
+---
 
 Default = {
     
@@ -47,6 +47,8 @@ Default = {
 &nbsp;&nbsp;&nbsp;&nbsp;default value for field only.
 
 }
+
+---
 
 functions - 
 
@@ -62,4 +64,4 @@ functions -
 
 &nbsp;&nbsp;&nbsp;update_record
 
---
+---
