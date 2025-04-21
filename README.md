@@ -54,16 +54,16 @@ Default = {
 
 functions - 
 
-&nbsp;&nbsp;&nbsp;check_data
+&nbsp;&nbsp;&nbsp;Model_Class.check_data
 
-&nbsp;&nbsp;&nbsp;print_schema
+&nbsp;&nbsp;&nbsp;Model_Class.print_schema
 
-&nbsp;&nbsp;&nbsp;compare_records
+&nbsp;&nbsp;&nbsp;Model_Class.compare_records
 
-&nbsp;&nbsp;&nbsp;compare_record
+&nbsp;&nbsp;&nbsp;Model_Class.compare_record
 
-&nbsp;&nbsp;&nbsp;update_records
+&nbsp;&nbsp;&nbsp;Model_Class.update_records
 
-&nbsp;&nbsp;&nbsp;update_record
+&nbsp;&nbsp;&nbsp;Model_Class.update_record
 
 ---
