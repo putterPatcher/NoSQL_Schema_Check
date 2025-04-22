@@ -15,13 +15,20 @@ class Type:
         return "{}".format(self.__type)
 
 class NP_Type:
-    def __init__(self, type, value):
+    def __init__(self, type, value, validation, required=None):
         self.__type = type
         self.__value = value
+        self.__validation = validation
+        if self.__type == 'dict':
+            self.__required = required
     @property
     def type(self):return self.__type;
     @property
     def value(self):return self.__value;
+    @property
+    def validation(self):return self.__validation;
+    @property
+    def required(self):return self.__required if self.__type == 'dict' else None;
 
 
 class Model:
@@ -31,20 +38,41 @@ class Model:
     Schema={}
     Validations={}
     Default={}
+    Required=["_id",]
 
     @staticmethod
     def __get_type(item) -> str:return item.__class__.__name__
     
     @classmethod
-    def __get_record_type(cls, schema: any, *args, **kwargs) -> NP_Type | bool:
+    def __get_record_type(cls, schema: any, required:list[str] | None, *args, **kwargs) -> NP_Type | bool:
         try:
+            '''
+                type = dict, contains key, value pairs.
+            '''
             if (type:=cls.__get_type(schema)) == 'dict':
+                schema_keys = schema.keys();
+                required_fields_dict = []
+                if required:
+                    for i in required:
+                        if cls.__get_type(i) == 'tuple':
+                            i = i[0]
+                        if i not in schema_keys:raise Exception("Required field '{}' not present in Schema".format(i))
+                        required_fields_dict.append(i)
                 ret = {}
                 kwargs_keys = kwargs.keys()
-                for i in schema.keys():
+                for i in schema_keys:
+                    required_fields = []
+                    for j in required:
+                        if cls.__get_type(j) == 'tuple' and j[0] == i:
+                            required_fields = j[1]
                     if i not in kwargs_keys:
                         kwargs[i] = None
-                        print("validation for '{}' field does not exist.".format(i))
+                        print("Validation for '{}' field does not exist.".format(i))
+                    validation = None
+                    '''
+                        kwargs[i] = (function, something)
+                    '''
+                    print(kwargs[i], "kwargs...", schema[i], i)
                     if (type:=cls.__get_type(data:=schema[i])) == 'tuple':
                         '''
                             data = (type), kwargs[i] = validation
@@ -52,13 +80,23 @@ class Model:
                             data = ('list', dict), kwargs[i] = dict
                             data = ('list', tuple), kwargs[i] = with something
                         '''
-                        ret[i] = cls.__get_record_type(data, *(kwargs[i],))
+                        print(required_fields, data, "???", kwargs[i])
+                        if cls.__get_type(kwargs[i]) == 'tuple':
+                            ret[i] = cls.__get_record_type(data, required_fields, *(kwargs[i][0], (kwargs[i][1],) if len(kwargs[i]) > 1 else (None,)))
+                        else:
+                            ret[i] = cls.__get_record_type(data, required_fields, *(kwargs[i],))
                     elif type == 'dict':
                         '''
-                            data = dict, kwargs[i] = dict
+                            data = dict, kwargs[i] = (validation, dict)
                         '''
                         if kwargs[i] == None:kwargs[i] = {}
-                        ret[i] = cls.__get_record_type(data, **kwargs[i])
+                        if cls.__get_type(kwargs[i]) == 'tuple':
+                            args = (kwargs[i][0],)
+                            kwargs[i] = kwargs[i][1]
+                            print("dict after dict", kwargs[i], args, data)
+                            ret[i] = cls.__get_record_type(data, required_fields, *args, **kwargs[i])
+                        else:
+                            ret[i] = cls.__get_record_type(data, required_fields, None, **kwargs[i])
                     else:
                         '''
                             data = type, kwargs[i] = validation
@@ -67,53 +105,52 @@ class Model:
                         ret[i] = Type(data, kwargs[i])
                     if ret[i] == False:
                         raise Exception()
-                return NP_Type('dict', ret)
+                return NP_Type('dict', ret, args[0], required_fields_dict)
             elif type == 'tuple':
                 if schema[0] == 'list':
                     data = None
+                    validation = None
+                    '''
+                        args = (function, something) or (something)
+                    '''
+                    if len(args) > 1 and cls.__get_type(args[0]) == 'function':validation = args[0];args=args[1];
                     if (type:=cls.__get_type(data:=schema[1])) == 'dict':
                         '''
-                            data = dict, args = (dict)
+                            data = dict, args = (dict) or ((validation, dict),) or None
                         '''
-                        data = cls.__get_record_type(data, **args[0])
-                    elif type == 'tuple':
-                        if (data[0]) == 'list':
-                            if (type:=cls.__get_type(data[1])) == 'dict':
-                                '''
-                                    data[1] = dict, args = (dict)
-                                '''
-                                data = cls.__get_record_type(data[1], **args)
-                            elif type == 'tuple':
-                                '''
-                                    data[1] = tuple, args = (with something)
-                                '''
-                                data = cls.__get_record_type(data[1], *args)
-                            else:
-                                '''
-                                    data[1] = type, args = (validation)
-                                '''
-                                if len(args) == 0:args = (None,)
-                                data = Type(data[1], args[0])
+                        if cls.__get_type(args[0]) == 'tuple':
+                            data = cls.__get_record_type(data, required, *(args[0][0],), **args[0][1])
                         else:
-                            '''
-                                data = (type), args = (validation)
-                            '''
-                            if len(args) == 0:args = (None,)
-                            data = cls.__get_record_type(data, *args)
+                            if args[0] == None:
+                                args = ({},)
+                            data = cls.__get_record_type(data, required, None, **args[0])
+                    elif type == 'tuple':
+                        '''
+                            data = tuple, args = (with something)
+                        '''
+                        data = cls.__get_record_type(data, required, *args)
                     else:
                         '''
-                            data = type args = (validation)
+                            data = type, args = (validation)
                         '''
                         if len(args) == 0:args = (None,)
                         data = Type(data, args[0])
+                    # else:
+                    #     '''
+                    #         data = (type), args = (validation)
+                    #     '''
+                    #     if len(args) == 0:args = (None,)
+                    #     data = cls.__get_record_type(data, *args)
                     if data == False:
                         raise Exception()
-                    return NP_Type('list', data)
+                    print(data)
+                    return NP_Type('list', data, validation)
                 else:
                     '''
                         schema = (type), args = (validation)
                     '''
                     if len(args) == 0:args = (None,)
+                    print(schema, args, "???")
                     return Type(schema[0], args[0])
         except Exception as e:
             print(e)
@@ -136,12 +173,12 @@ class Model:
                 try:
                     schema_keys = list(schema.keys())
                     dic_keys = list(dic.keys())
-                    if len(schema_keys) > len(dic_keys):raise Exception("fields {} not present in data.".format([i for i in schema_keys if i not in dic_keys]))
+                    # if len(schema_keys) > len(dic_keys):raise Exception("fields {} not present in data.".format([i for i in schema_keys if i not in dic_keys]))
                     if not allow_extra:
                         if len(schema_keys) < len(dic_keys):raise Exception("fields {} not present in schema.".format([i for i in dic_keys if i not in schema_keys]))
-                    for i in schema.keys():
+                    for i in dic_keys:
                         if (type:=cls.__get_type(dic[i])) == 'dict':
-                            cls.__check_data(schema[i], allow_extra, **dic[i])
+                                cls.__check_data(schema[i], allow_extra, **dic[i])
                         elif type == "list":
                             cls.__check_data(schema[i], allow_extra, *dic[i])
                         else:
@@ -151,12 +188,13 @@ class Model:
             def __check_list(schema, list: list[any]):
                 try:
                     for i in list:
+                        # print(i, schema.type, schema.value)
                         if schema.type != (type:=cls.__get_type(i)):raise Exception(error(type, schema.type))
                         else:
                             if type == 'dict':
-                                cls.__check_data(schema.value, allow_extra, **i)
+                                cls.__check_data(schema, allow_extra, **i)
                             elif type == 'list':
-                                cls.__check_data(schema.value, allow_extra, *i)
+                                cls.__check_data(schema, allow_extra, *i)
                             else:
                                 cls.__check_data(schema, allow_extra, *(i,))
                 except Exception as e:
@@ -164,11 +202,18 @@ class Model:
             def error(s1, s2):return "got type {}, expected {}".format(s1, s2)
             if (type:=cls.__get_type(schema)) == 'NP_Type':
                 if schema.type == 'dict' and len(dict_data) != 0:
+                    if not cls.__validate(dict_data, schema.validation):
+                        raise Exception("Validation for value '{}' failed.".format(dict_data))
+                    if schema.required:
+                        for i in dict_data.keys():
+                            if i not in schema.required:raise Exception("Field '{}' not present in {}".format(i, list(schema.value.keys())))
                     __check_dict(schema.value, dict_data)
                 elif schema.type == 'list' and len(data) != 0:
+                    if not cls.__validate(data, schema.validation):
+                        raise Exception("Vaidation for value '{}' failed".format(list(data)))
                     __check_list(schema.value, data)
                 else:
-                    raise Exception(error('different', 'dict or list'))
+                    raise Exception(error('dict' if len(dict_data) > 0 else 'list', schema.type))
             elif type == 'Type':
                 for i in data:
                     if (type:=cls.__get_type(i)) != schema.type:
@@ -186,6 +231,8 @@ class Model:
     def check_data(cls, data: dict, allow_extra=False):
         '''
             data: dict of record
+
+            "DOES NOT ADD DEFAULT VALUES"
         '''
         i:str = None
         try:
@@ -193,38 +240,52 @@ class Model:
                 data["_id"]=ObjectId()
             schema_keys = list(cls.__Model_Schema.value.keys())
             dic_keys = list(data.keys())
-            if len(schema_keys) > len(dic_keys):raise Exception("fields {} not present in data.".format([i for i in schema_keys if i not in dic_keys]))
-            if not allow_extra:
-                if len(schema_keys) < len(dic_keys):raise Exception("fields {} not present in schema.".format([i for i in dic_keys if i not in schema_keys]))
-            for i in cls.__Model_Schema.value.keys():
-                if (type:=cls.__Model_Schema.value[i].type) == 'dict':
+            if len(cls.__Model_Schema.required) > len(dic_keys):raise Exception("fields {} not present in data.".format([i for i in schema_keys if i not in dic_keys]))
+            '''
+                check if required fields present
+            '''
+            for i in cls.__Model_Schema.required:
+                if i not in dic_keys:raise Exception("Required field {} is not present.".format(i))
+            for i in data.keys():
+                try:
+                    if (type:=cls.__Model_Schema.value[i].type) == 'dict':
+                        try:
+                            if cls.__get_type(data[i]) != 'dict':
+                                print("dict type expected.")
+                                raise Exception()
+                            cls.__check_data(cls.__Model_Schema.value[i], allow_extra, **data[i])
+                        except Exception as e:
+                            raise Exception(e)
+                    elif type == 'list':
+                        try:
+                            if cls.__get_type(data[i]) != 'list':
+                                print("list type expected.")
+                                raise Exception()
+                            cls.__check_data(cls.__Model_Schema.value[i], allow_extra, *data[i])
+                        except Exception as e:
+                            raise Exception(e)
+                    else:
+                        cls.__check_data(cls.__Model_Schema.value[i], allow_extra, *(data[i],))
+                except Exception as e:
                     try:
-                        if cls.__get_type(data[i]) != 'dict':
-                            raise Exception("dict type expected")
-                        cls.__check_data(cls.__Model_Schema.value[i], allow_extra, **data[i])
+                        if allow_extra and cls.__Model_Schema.value[i]:continue;
+                        else:raise Exception(e)
                     except:
-                        raise Exception("got type {}, expected dict".format(cls.__get_type(data[i])))
-                elif type == 'list':
-                    try:
-                        if cls.__get_type(data[i]) != 'list':
-                            raise Exception("list type expected")
-                        cls.__check_data(cls.__Model_Schema.value[i], allow_extra, *data[i])
-                    except:
-                        raise Exception("got type {}, expected list".format(cls.__get_type(data[i])))
-                else:
-                    cls.__check_data(cls.__Model_Schema.value[i], allow_extra, *(data[i],))
+                        print(e)
+                        raise Exception("type/validation Error.")
             return data
         except Exception as e:
-            print(str(e)+(" In field: {}\n{} FIELD's SCHEMA:".format(i, i) if i is not None else ""))
+            print((" In field: {}\n{} FIELD's SCHEMA:".format(i, i) if i is not None else ""))
             cls.print_schema(cls.__Model_Schema.value[i])
-            return None
+            print(str(e))
+            raise Exception("Incorrect Fields.")
 
     @classmethod
     def generate(cls):
         '''
             generate the Schema Type object (NP_Type) for model
         '''
-        def __generate_schema_object(model_name: str, Schema: dict, Validations: dict):
+        def __generate_schema_object(model_name: str, Schema: dict, Validations: dict, Required: list[str]=None):
             try:
                 if "_id" not in Schema.keys():
                     # raise Exception("field '_id' is not present.")
@@ -232,7 +293,7 @@ class Model:
                     Validations["_id"]=None
                 type_dict = None
                 if type(Schema) == dict and type(Validations) == dict:
-                    type_dict = cls.__get_record_type(Schema, **Validations)
+                    type_dict = cls.__get_record_type(Schema, Required, **Validations)
                 else:
                     raise Exception("Model_Class.Schema and Model_Class.Validations must have type dict.")
                 if not type_dict:raise Exception("Object creation failed.")
@@ -243,11 +304,12 @@ class Model:
             except Exception as e:
                 print("Error generating model {}".format(model_name.capitalize()))
                 print(e)
-                return None
+                exit(1)
         if len(cls.Schema) > 0 and cls.name != "":
-            cls.__Model_Schema = __generate_schema_object(cls.name, cls.Schema, cls.Validations)
+            cls.__Model_Schema = __generate_schema_object(cls.name, cls.Schema, cls.Validations, cls.Required)
         else:
             print("Model_Class must have variables 'Schema' and 'name'.")
+            exit(1)
     
     @classmethod
     def print_schema(cls, schema:NP_Type | Type=None, tab=0):
@@ -283,8 +345,7 @@ class Model:
                 data[i] = cls.Default[i]();
             return data
         except Exception as e:
-            print(e)
-            return None
+            raise Exception(e);
 
     @classmethod
     def compare_records(cls, *records: dict, allow_extra=False):
@@ -295,20 +356,22 @@ class Model:
         '''
         try:
             return [cls.check_data(cls.__add_defaults(i), allow_extra) for i in records];
-        except Exception as e:print(e);return None;
+        except Exception as e:print(e);raise Exception(e);
     
     @classmethod
-    def compare_record(cls, data: dict, allow_extra=False):
+    def compare_record(cls, record: dict, allow_extra=False):
         '''
             data: dict of record
 
             allow_extra: allow extra fields.
         '''
-        try:return cls.check_data(cls.__add_defaults(data), allow_extra);
-        except Exception as e:print(e);return None;
+        try:return cls.check_data(cls.__add_defaults(record), allow_extra);
+        except Exception as e:
+            print(e);
+            raise Exception(e);
 
     @classmethod
-    def update_record(cls, fields: dict, data: dict, allow_extra=False):
+    def update_record(cls, fields: dict, record: dict, allow_extra=False):
         '''
             fields: dict of updated field data
 
@@ -317,12 +380,12 @@ class Model:
             allow_extra: allow extra fields.
         '''
         try:
-            for i, j in fields.keys():data[i] = j;
-            return cls.check_data(cls.__add_defaults(data), allow_extra);
-        except Exception as e:print(e);return None;
+            for i, j in fields.keys():record[i] = j;
+            return cls.check_data(cls.__add_defaults(record), allow_extra);
+        except Exception as e:print(e);raise Exception(e);
 
     @classmethod
-    def update_records(cls, fields: dict, *data: dict, allow_extra=False):
+    def update_records(cls, fields: dict, *records: dict, allow_extra=False):
         '''
             fields: dict of updated field data
 
@@ -331,11 +394,47 @@ class Model:
             allow_extra: allow extra fields.
         '''
         try:
-            for i in data:
+            for i in records:
                 for j, k in fields.keys():i[j] = k;
-            return [cls.check_data(cls.__add_defaults(i), allow_extra) for i in data];
-        except Exception as e:print(e);return None;
+            return [cls.check_data(cls.__add_defaults(i), allow_extra) for i in records];
+        except Exception as e:raise Exception(e);
 
+
+# class Test(Model):
+#     Schema={
+#         "integer": "int",
+#         "string": "str",
+#         "list": ('list', "int"),
+#         "dict": {
+#             "key": "int", 
+#             "key1": ('list', {
+#                 "integer": "int", 
+#                 "list": ('list', 'str')
+#             })
+#         },
+#         "list_in_list": ('list', ('list', "str"))
+#     }
+#     Validations={
+#         "integer": lambda i: i < 10,
+#         "string": lambda s: len(s) < 10,
+#         "list": (lambda l: len(l) < 4, lambda i: i < 10),
+#         "dict":(lambda d: len(d) < 3,
+#             {
+#                 "key": lambda i: i < 10,
+#                 "key1": (lambda l: len(l) < 2,)
+#             }),
+#         "list_in_list": lambda s: len(s) < 10
+#     }
+#     Required=["integer", "list", ('dict', ["key", ("key1", ["integer"])])]
+#     Default={"string":lambda:"Default_String"[:9]}
+#     name="test"
+
+# Test.generate()
+
+# try:
+#     print(Test.compare_record({"integer": 9, "list": [2, 3, 5], "dict": {"key": 9, "key1": [{"integer": 30}]}, "list_in_list": [["string1", "string2", "string3"]]}))
+# except:
+#     pass
 
 
 
