@@ -269,7 +269,7 @@ class Model:
                         cls.__check_data(cls.__Model_Schema.value[i], allow_extra, *(data[i],))
                 except Exception as e:
                     try:
-                        if allow_extra and not cls.__Model_Schema.value[i]:continue;
+                        if allow_extra and i not in cls.__Model_Schema.value.keys():continue;
                         else:raise Exception(e)
                     except:
                         print(e)
