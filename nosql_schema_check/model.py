@@ -50,6 +50,7 @@ class Model:
                 type = dict, contains key, value pairs.
             '''
             if (type:=cls.__get_type(schema)) == 'dict':
+                args_dict = args
                 schema_keys = schema.keys();
                 required_fields_dict = []
                 if required:
@@ -89,11 +90,11 @@ class Model:
                         '''
                             data = dict, kwargs[i] = (validation, dict)
                         '''
+                        print("dict after dict", kwargs[i], args, data)
                         if kwargs[i] == None:kwargs[i] = {}
                         if cls.__get_type(kwargs[i]) == 'tuple':
                             args = (kwargs[i][0],)
                             kwargs[i] = kwargs[i][1]
-                            # print("dict after dict", kwargs[i], args, data)
                             ret[i] = cls.__get_record_type(data, required_fields, *args, **kwargs[i])
                         else:
                             ret[i] = cls.__get_record_type(data, required_fields, None, **kwargs[i])
@@ -105,7 +106,7 @@ class Model:
                         ret[i] = Type(data, kwargs[i])
                     if ret[i] == False:
                         raise Exception()
-                return NP_Type('dict', ret, args[0], required_fields_dict)
+                return NP_Type('dict', ret, args_dict[0], required_fields_dict)
             elif type == 'tuple':
                 if schema[0] == 'list':
                     data = None
@@ -293,7 +294,7 @@ class Model:
                     Validations["_id"]=None
                 type_dict = None
                 if type(Schema) == dict and type(Validations) == dict:
-                    type_dict = cls.__get_record_type(Schema, Required, **Validations)
+                    type_dict = cls.__get_record_type(Schema, Required, None, **Validations)
                 else:
                     raise Exception("Model_Class.Schema and Model_Class.Validations must have type dict.")
                 if not type_dict:raise Exception("Object creation failed.")
@@ -412,7 +413,13 @@ class Model:
 #                 "list": ('list', 'str')
 #             })
 #         },
-#         "list_in_list": ('list', ('list', "str"))
+#         "list_in_list": ('list', ('list', "str")),
+#         "dict_in_dict": {
+#             "a": 'int',
+#             "b": {
+#                 "a": 'str'
+#             }
+#         }
 #     }
 #     Validations={
 #         "integer": lambda i: i < 10,
@@ -423,7 +430,13 @@ class Model:
 #                 "key": lambda i: i < 10,
 #                 "key1": (lambda l: len(l) < 2,)
 #             }),
-#         "list_in_list": lambda s: len(s) < 10
+#         "list_in_list": lambda s: len(s) < 10,
+#         "dict_in_dict": {
+#             "b": {
+#                 "a": lambda s: len(s) < 20,
+#             },
+#             "a":lambda i: i < 20
+#         }
 #     }
 #     Required=["integer", "list", ('dict', ["key", ("key1", ["integer"])])]
 #     Default={"string":lambda:"Default_String"[:9]}
@@ -435,6 +448,4 @@ class Model:
 #     print(Test.compare_record({"integer": 9, "list": [2, 3, 5], "dict": {"key": 9, "key1": [{"integer": 30}]}, "list_in_list": [["string1", "string2", "string3"]]}))
 # except:
 #     pass
-
-
 
