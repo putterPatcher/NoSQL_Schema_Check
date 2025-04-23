@@ -72,7 +72,7 @@ class Model:
                     '''
                         kwargs[i] = (function, something)
                     '''
-                    print(kwargs[i], "kwargs...", schema[i], i)
+                    # print(kwargs[i], "kwargs...", schema[i], i)
                     if (type:=cls.__get_type(data:=schema[i])) == 'tuple':
                         '''
                             data = (type), kwargs[i] = validation
@@ -80,7 +80,7 @@ class Model:
                             data = ('list', dict), kwargs[i] = dict
                             data = ('list', tuple), kwargs[i] = with something
                         '''
-                        print(required_fields, data, "???", kwargs[i])
+                        # print(required_fields, data, "???", kwargs[i])
                         if cls.__get_type(kwargs[i]) == 'tuple':
                             ret[i] = cls.__get_record_type(data, required_fields, *(kwargs[i][0], (kwargs[i][1],) if len(kwargs[i]) > 1 else (None,)))
                         else:
@@ -93,7 +93,7 @@ class Model:
                         if cls.__get_type(kwargs[i]) == 'tuple':
                             args = (kwargs[i][0],)
                             kwargs[i] = kwargs[i][1]
-                            print("dict after dict", kwargs[i], args, data)
+                            # print("dict after dict", kwargs[i], args, data)
                             ret[i] = cls.__get_record_type(data, required_fields, *args, **kwargs[i])
                         else:
                             ret[i] = cls.__get_record_type(data, required_fields, None, **kwargs[i])
@@ -143,14 +143,14 @@ class Model:
                     #     data = cls.__get_record_type(data, *args)
                     if data == False:
                         raise Exception()
-                    print(data)
+                    # print(data)
                     return NP_Type('list', data, validation)
                 else:
                     '''
                         schema = (type), args = (validation)
                     '''
                     if len(args) == 0:args = (None,)
-                    print(schema, args, "???")
+                    # print(schema, args, "???")
                     return Type(schema[0], args[0])
         except Exception as e:
             print(e)
