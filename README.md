@@ -77,7 +77,7 @@ functions -
 ---
 
 Example:
-'''python
+```python
 class Test(Model):
     Schema={
         "integer": "int",
@@ -130,4 +130,4 @@ try:
     print(Test.update_records([{"integer": 5, "list": [10,20,30]},], [data,]))
 except:
     pass
-'''
+```
