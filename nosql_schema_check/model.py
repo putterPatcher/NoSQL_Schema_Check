@@ -90,7 +90,7 @@ class Model:
                         '''
                             data = dict, kwargs[i] = (validation, dict)
                         '''
-                        print("dict after dict", kwargs[i], args, data)
+                        # print("dict after dict", kwargs[i], args, data)
                         if kwargs[i] == None:kwargs[i] = {}
                         if cls.__get_type(kwargs[i]) == 'tuple':
                             args = (kwargs[i][0],)
@@ -200,21 +200,26 @@ class Model:
                                 cls.__check_data(schema, allow_extra, *(i,))
                 except Exception as e:
                     raise Exception(e)
-            def error(s1, s2):return "got type {}, expected {}".format(s1, s2)
+            def error(s1, s2):return "Got type {}, expected {}".format(s1, s2)
             if (type:=cls.__get_type(schema)) == 'NP_Type':
                 if schema.type == 'dict' and len(dict_data) != 0:
                     if not cls.__validate(dict_data, schema.validation):
                         raise Exception("Validation for value '{}' failed.".format(dict_data))
                     if schema.required:
-                        for i in dict_data.keys():
-                            if i not in schema.required:raise Exception("Field '{}' not present in {}".format(i, list(schema.value.keys())))
+                        for i in schema.required:
+                            if i not in dict_data.keys():raise Exception("Required field '{}' not present in fields {}".format(i, list(dict_data.keys())))
                     __check_dict(schema.value, dict_data)
                 elif schema.type == 'list' and len(data) != 0:
                     if not cls.__validate(data, schema.validation):
                         raise Exception("Vaidation for value '{}' failed".format(list(data)))
                     __check_list(schema.value, data)
                 else:
-                    raise Exception(error('dict' if len(dict_data) > 0 else 'list', schema.type))
+                    if len(dict_data) > 0:
+                        raise Exception(error('dict', schema.type))
+                    elif len(data) > 0:
+                        raise Exception(error('list', schema.type))
+                    else:
+                        raise Exception("Got empty {}".format(schema.type))
             elif type == 'Type':
                 for i in data:
                     if (type:=cls.__get_type(i)) != schema.type:
@@ -239,46 +244,40 @@ class Model:
         try:
             if "_id" not in data.keys():
                 data["_id"]=ObjectId()
-            schema_keys = list(cls.__Model_Schema.value.keys())
             dic_keys = list(data.keys())
-            if len(cls.__Model_Schema.required) > len(dic_keys):raise Exception("fields {} not present in data.".format([i for i in schema_keys if i not in dic_keys]))
-            '''
-                check if required fields present
-            '''
-            for i in cls.__Model_Schema.required:
-                if i not in dic_keys:raise Exception("Required field {} is not present.".format(i))
+            if len(fields:=[i for i in cls.__Model_Schema.required if i not in dic_keys]) > 0:raise Exception("Required fields {} not present in data.".format(fields))
             for i in data.keys():
-                try:
+                if i not in cls.__Model_Schema.value.keys():
+                    if allow_extra:continue;
+                    else:
+                        raise KeyError(i)
+                else:
                     if (type:=cls.__Model_Schema.value[i].type) == 'dict':
                         try:
                             if cls.__get_type(data[i]) != 'dict':
-                                print("dict type expected.")
-                                raise Exception()
+                                raise Exception("'dict' type expected.")
                             cls.__check_data(cls.__Model_Schema.value[i], allow_extra, **data[i])
                         except Exception as e:
                             raise Exception(e)
                     elif type == 'list':
                         try:
                             if cls.__get_type(data[i]) != 'list':
-                                print("list type expected.")
-                                raise Exception()
+                                raise Exception("'list' type expected.")
                             cls.__check_data(cls.__Model_Schema.value[i], allow_extra, *data[i])
                         except Exception as e:
                             raise Exception(e)
                     else:
                         cls.__check_data(cls.__Model_Schema.value[i], allow_extra, *(data[i],))
-                except Exception as e:
-                    try:
-                        if allow_extra and i not in cls.__Model_Schema.value.keys():continue;
-                        else:raise Exception(e)
-                    except:
-                        print(e)
-                        raise Exception("type/validation Error.")
             return data
+        except KeyError as e:
+            print("type/validation Error.")
+            print("Invalid field {}".format(e))
+            raise Exception("Incorrect Fields.")
         except Exception as e:
-            print((" In field: {}\n{} FIELD's SCHEMA:".format(i, i) if i is not None else ""))
-            cls.print_schema(cls.__Model_Schema.value[i])
-            print(str(e))
+            print(("\nIn field: {}\n{} FIELD's SCHEMA:".format(i, i) if i is not None else ""))
+            cls.print_schema(cls.__Model_Schema.value[i] if i is not None else cls.__Model_Schema)
+            print("type/validation Error.")
+            print(e)
             raise Exception("Incorrect Fields.")
 
     @classmethod
@@ -349,15 +348,15 @@ class Model:
             raise Exception(e);
 
     @classmethod
-    def compare_records(cls, *records: dict, allow_extra=False):
+    def compare_records(cls, records: list[dict] | tuple[dict], allow_extra=False):
         '''
             *records: dicts of records
 
             allow_extra: allow extra fields.
         '''
         try:
-            return [cls.check_data(cls.__add_defaults(i), allow_extra) for i in records];
-        except Exception as e:print(e);raise Exception(e);
+            return list(map(lambda i:cls.check_data(cls.__add_defaults(i), allow_extra), records));
+        except Exception as e:raise Exception(e);
     
     @classmethod
     def compare_record(cls, record: dict, allow_extra=False):
@@ -368,7 +367,6 @@ class Model:
         '''
         try:return cls.check_data(cls.__add_defaults(record), allow_extra);
         except Exception as e:
-            print(e);
             raise Exception(e);
 
     @classmethod
@@ -381,12 +379,12 @@ class Model:
             allow_extra: allow extra fields.
         '''
         try:
-            for i, j in fields.keys():record[i] = j;
+            for i, j in fields.items():record[i] = j;
             return cls.check_data(cls.__add_defaults(record), allow_extra);
-        except Exception as e:print(e);raise Exception(e);
+        except Exception as e:raise Exception(e);
 
     @classmethod
-    def update_records(cls, fields: dict, *records: dict, allow_extra=False):
+    def update_records(cls, fields: list[dict] | tuple[dict], records: list[dict] | tuple[dict], allow_extra=False):
         '''
             fields: dict of updated field data
 
@@ -395,9 +393,9 @@ class Model:
             allow_extra: allow extra fields.
         '''
         try:
-            for i in records:
-                for j, k in fields.keys():i[j] = k;
-            return [cls.check_data(cls.__add_defaults(i), allow_extra) for i in records];
+            for n, i in enumerate(records):
+                for j, k in fields[n].items():i[j] = k;
+            return list(map(lambda i:cls.check_data(cls.__add_defaults(i), allow_extra), records));
         except Exception as e:raise Exception(e);
 
 
@@ -422,9 +420,9 @@ class Model:
 #         }
 #     }
 #     Validations={
-#         "integer": lambda i: i < 10,
+#         "integer": lambda i:True if i < 10 else print("Integer must be less than 10."),
 #         "string": lambda s: len(s) < 10,
-#         "list": (lambda l: len(l) < 4, lambda i: i < 10),
+#         "list": (lambda l: len(l) < 4, lambda i: i < 100),
 #         "dict":(lambda d: len(d) < 3,
 #             {
 #                 "key": lambda i: i < 10,
@@ -445,7 +443,12 @@ class Model:
 # Test.generate()
 
 # try:
-#     print(Test.compare_record({"integer": 9, "list": [2, 3, 5], "dict": {"key": 9, "key1": [{"integer": 30}]}, "list_in_list": [["string1", "string2", "string3"]]}))
-# except:
-#     pass
+#     data = Test.compare_record({"integer": 9, "list": [2,3,5], "dict": {"key": 9, "key1": [{"integer": 20, "list": ["asdd", "sfd"]}]}, "list_in_list": [["string1", "string2", "string3"]], "Something": "Extra_Thing"}, True)
+#     print(data)
+#     data.pop("Something")
+#     print(Test.compare_records([data]))
+#     print(Test.update_record({"integer": 5, "list": [10,20,30]}, data))
+#     print(Test.update_records([{"integer": 5, "list": [10,20,30]},], [data,]))
+# except Exception as e:
+#     print(e)
 
